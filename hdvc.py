@@ -23,7 +23,7 @@ def load_data():
     # Cargar dataset de obesidad
     obesity_data = pd.read_csv("BEFA58B_ALL_LATEST.csv")  # Ajusta el nombre a tu archivo CSV real
     # Cargar shapefile del mapa mundial
-    file_path = "C:/Users/raulv/Documents/MBDS/HDVC/hdvc/ne_50m_admin_0_countries/ne_50m_admin_0_countries.shp"
+    file_path = "ne_50m_admin_0_countries/ne_50m_admin_0_countries.shp"
     world = gpd.read_file(file_path)
     
     return obesity_data, world
@@ -124,7 +124,7 @@ elif option == "Gráficas de Tendencias":
     st.header("Evolución de la Prevalencia de Obesidad por Región")
     
     # Revisar si existe la columna 'region' en el dataset
-    if "region" not in data.columns:
+    if "NAME" not in data.columns:
         st.warning("No se encontró la columna 'region' en los datos.")
         st.stop()
     
@@ -156,21 +156,4 @@ elif option == "Gráficas de Tendencias":
         else:
             st.warning("No se encontraron las columnas 'DIM_TIME' o 'RATE_PER_100_N' en los datos.")
 
-# # Filtros en la barra lateral
-# alcohol_filter = st.sidebar.slider("Nivel de Consumo de Alcohol", 0, 100, (10, 50))
-# actividad_filter = st.sidebar.slider("Horas de Ejercicio", 0, 40, (5, 20))
 
-# # Filtra los datos
-# filtered_data = df
-
-# # Visualización: Scatterplot
-# st.subheader("Gráfico de Consumo de Alcohol vs Ejercicio Físico")
-# fig, ax = plt.subplots()
-# ax.scatter(filtered_data['columna 1'], filtered_data['columna 2'], alpha=0.7)
-# ax.set_xlabel("Consumo de Alcohol")
-# ax.set_ylabel("Horas de Ejercicio")
-# st.pyplot(fig)
-
-# # Tabla interactiva
-# st.subheader("Datos Filtrados")
-# st.dataframe(filtered_data)
