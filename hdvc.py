@@ -4,9 +4,17 @@ import geopandas as gpd
 from geodatasets import get_path
 import matplotlib.pyplot as plt
 import seaborn as sns
-
 # ----------------------------------------------------------------------
-# 1. Carga de datos
+# 1. Configuración de la Aplicación
+# ----------------------------------------------------------------------
+st.set_page_config(
+    page_title="Visualización de la Prevalencia de Obesidad",
+    layout="wide"
+)
+st.title("Visualización Interactiva: Prevalencia de Obesidad Mundial y Regional")
+st.sidebar.header("Filtros de Visualización")
+# ----------------------------------------------------------------------
+# 2. Carga de datos
 # ----------------------------------------------------------------------
 # Si no vas a usar el archivo Excel "data.xlsx", puedes comentarlo o quitarlo.
 # file_path = 'data.xlsx'
@@ -25,21 +33,17 @@ def load_data():
     # Cargar shapefile del mapa mundial
     file_path = "ne_50m_admin_0_countries/ne_50m_admin_0_countries.shp"
     world = gpd.read_file(file_path)
+    europe_countries = world[world['CONTINENT'] == 'Europe']
     
-    return obesity_data, world
+    return obesity_data, europe_countries
 
 # ----------------------------------------------------------------------
 # Cargar datos
 # ----------------------------------------------------------------------
 data, world = load_data()
 
-# ----------------------------------------------------------------------
-# 2. Configuración de la página y títulos en Streamlit
-# ----------------------------------------------------------------------
-st.title("Visualizing the Global Prevalence of Obesity")
-st.sidebar.header("Filtros")
 
-# ----------------------------------------------------------------------
+
 # 3. Ajuste de columnas (si fuese necesario) para hacer el merge
 #    Asegúrate de que 'GEO_NAME_SHORT' sea la columna que corresponde
 #    a los nombres de país en tu dataset.
@@ -48,13 +52,29 @@ st.sidebar.header("Filtros")
 if "GEO_NAME_SHORT" in data.columns:
     data.rename(columns={"GEO_NAME_SHORT": "NAME"}, inplace=True)
 
+# Corrección de nombres para unir datos
+name_corrections = {
+    'Antigua and Barbuda': 'Antigua and Barb.',
+    'Bolivia (Plurinational State of)': 'Bolivia',
+    'Bosnia and Herzegovina': 'Bosnia and Herz.',
+    # Agrega todas las equivalencias necesarias
+}
+
+data["NAME"] = data["NAME"].replace(name_corrections)
 # ----------------------------------------------------------------------
 # 4. Unir datos del mapa con los datos de obesidad
 # ----------------------------------------------------------------------
 # Asegúrate de que 'name' exista en ambos dataframes.
 # 'world' normalmente tiene una columna 'name' con los nombres de país,
 # pero puedes revisar si coincide con los nombres de tu dataset (puede ser 'iso_a3', etc.)
-world = world.merge(data, left_on="NAME", right_on="NAME", how="left")
+world = world.merge(data, on="NAME", how="inner")
+
+# Selección del año (DIM_TIME)
+available_years = sorted(data["DIM_TIME"].dropna().unique())
+selected_year = st.sidebar.selectbox("Selecciona un año:", available_years)
+
+# Filtrar los datos por el año seleccionado
+filtered_data = data[data["DIM_TIME"] == selected_year]
 
 # Eliminar la columna 'NAME' duplicada de world_merged
 #world.drop(columns=["NAME"], inplace=True)
@@ -69,72 +89,59 @@ option = st.sidebar.radio(
 # ----------------------------------------------------------------------
 # 6. Mapa Mundial con filtro por año
 # ----------------------------------------------------------------------
+# Mapa Mundial: Prevalencia de Obesidad por País
 if option == "Mapa Mundial":
     st.header("Mapa Mundial: Prevalencia de Obesidad por País")
 
-    # Selección del año (DIM_TIME)
-    if "DIM_TIME" in data.columns:
-        available_years = sorted(data["DIM_TIME"].dropna().unique())
-        selected_year = st.sidebar.selectbox("Selecciona un año:", available_years)
-    else:
-        st.warning("No se encontró la columna 'DIM_TIME' en los datos.")
-        st.stop()
-
-    # Filtrar los datos por el año seleccionado
-    filtered_data = data[data["DIM_TIME"] == selected_year]
-
     # Asegurarse de que las columnas de los países coincidan en ambos DataFrames
-    world_filtered = world.drop(columns=[col for col in world.columns if col not in ["NAME", "geometry"]], errors="ignore")
-    world_filtered = world_filtered.merge(filtered_data, left_on="NAME", right_on="NAME", how="left")
+    world_filtered = world[["NAME", "geometry"]].copy()  # Filtramos solo las columnas necesarias
+    world_filtered = world_filtered.merge(filtered_data, on="NAME", how="left")
 
-    # Verificamos qué columna en 'filtered_data' tiene la prevalencia
-    # Supongamos que es "RATE_PER_100_N". Ajusta según tu CSV real.
-    if "RATE_PER_100_N" not in world_filtered.columns:
-        st.warning("No se encontró la columna 'RATE_PER_100_N' para colorear el mapa.")
-        st.stop()
-
-    # Crear la figura y ejes
+    # Pintar los países con la tasa de obesidad
+    # Crear la figura y los ejes
     fig, ax = plt.subplots(figsize=(15, 10))
 
-    # Dibuja las fronteras de todos los países
-    world.boundary.plot(ax=ax, linewidth=0.5, color='black')
+    # Dibujar los bordes de los países
+    #world.boundary.plot(ax=ax, linewidth=0.5, color='black')
 
-    #  Pintar los países con la tasa de obesidad
+    # Pintar los países con la tasa de obesidad
     world_filtered.plot(
         column="RATE_PER_100_N",
         ax=ax,
+        cmap="RdYlGn_r",  # Escala de colores intuitiva: verde a rojo
         legend=True,
-        cmap="OrRd",
+        missing_kwds={"color": "lightgrey", "label": "Sin datos"},
         legend_kwds={
             'label': "Prevalencia de Obesidad (%)",
             'orientation': "horizontal"
-        },
-        missing_kwds={"color": "lightgrey"}
+        }
     )
 
-    # Título y formateo
-    ax.set_title(f"Mapa Mundial: Prevalencia de Obesidad ({selected_year})", fontsize=16)
-    ax.set_axis_off()  # Oculta los ejes
+    # Ajustar el zoom al mapa (ejemplo: Europa)
+    ax.set_xlim([-30, 50])  # Longitud: de -30° a 50° (aproximadamente Europa)
+    ax.set_ylim([30, 75])   # Latitud: de 30° a 75° (aproximadamente Europa)
+
+    # Títulos y formato
+    ax.set_title(f"Mapa Mundial: Prevalencia de Obesidad ({selected_year})", fontsize=18)
+    ax.set_axis_off()  # Ocultar los ejes
+
+    # Mostrar el gráfico en Streamlit
     st.pyplot(fig)
+
 
 # ----------------------------------------------------------------------
 # 7. Gráficas de Tendencias
 # ----------------------------------------------------------------------
 elif option == "Gráficas de Tendencias":
     st.header("Evolución de la Prevalencia de Obesidad por Región")
-    
-    # Revisar si existe la columna 'region' en el dataset
-    if "NAME" not in data.columns:
-        st.warning("No se encontró la columna 'region' en los datos.")
-        st.stop()
-    
+        
     # Selección de regiones
-    regions = st.multiselect("Selecciona regiones:", data["NAME"].dropna().unique())
+    regions = st.multiselect("Selecciona regiones:", world["NAME"].dropna().unique())
     
     if not regions:
         st.warning("Selecciona al menos una región para mostrar las tendencias.")
     else:
-        filtered_data = data[data["NAME"].isin(regions)]
+        filtered_data = world[world["NAME"].isin(regions)]
         
         # Verificamos la columna 'DIM_TIME' y 'RATE_PER_100_N' para la gráfica
         if "DIM_TIME" in filtered_data.columns and "RATE_PER_100_N" in filtered_data.columns:
@@ -155,5 +162,33 @@ elif option == "Gráficas de Tendencias":
             st.pyplot(fig)
         else:
             st.warning("No se encontraron las columnas 'DIM_TIME' o 'RATE_PER_100_N' en los datos.")
+
+# Verificar que las columnas necesarias existan (ejemplo: 'GENDER', 'RATE_PER_100_N', 'NAME')
+if all(col in filtered_data.columns for col in ["DIM_SEX", "RATE_PER_100_N", "NAME"]):
+    # Filtrar solo hombres y mujeres
+    gender_data = filtered_data[filtered_data["DIM_SEX"].isin(["MALE", "FEMALE"])]
+
+    # Crear el gráfico de barras agrupadas
+    plt.figure(figsize=(15, 8))
+    sns.barplot(
+        data=gender_data,
+        x="NAME",  # País o región
+        y="RATE_PER_100_N",  # Tasa de obesidad
+        hue="DIM_SEX",  # Agrupación por género
+        palette="RdYlGn_r"  # Paleta de colores intuitiva
+    )
+
+    # Personalizar el gráfico
+    plt.title(f"Tasas de Obesidad por Género ({selected_year})", fontsize=16)
+    plt.xlabel("País o Región", fontsize=14)
+    plt.ylabel("Prevalencia de Obesidad (%)", fontsize=14)
+    plt.xticks(rotation=90, fontsize=10)  # Rotar nombres de países para mayor legibilidad
+    plt.legend(title="Género")
+    plt.tight_layout()
+
+    # Mostrar el gráfico en Streamlit
+    st.pyplot(plt)
+else:
+    st.warning("Las columnas necesarias ('GENDER', 'RATE_PER_100_N', 'NAME') no están disponibles en el dataset.")
 
 
