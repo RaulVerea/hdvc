@@ -20,16 +20,16 @@ st.set_page_config(
 st.title("Global and Regional Obesity Trends in Adults (18+ years) - WHO Data")
 st.markdown(
     """
-    ### About This Dashboard
-    This dashboard explores global and regional trends in adult obesity prevalence (18+ years) using data from the World Health Organization (WHO).  
-    Designed for policymakers, international organizations (e.g., WHO, UNICEF, FAO), public health ministries, NGOs, and businesses in the food and beverage sector, it provides actionable insights to:
-    
-    - **Policymakers and health ministries**: Design targeted public health interventions to address obesity trends across specific regions and populations.
-    - **International organizations and NGOs**: Identify priority areas for education campaigns and resource allocation to combat obesity.
-    - **Food and beverage companies**: Adapt product strategies to align with health and wellness trends in different regions.
+    ### Abstract
+    This dashboard provides an interactive exploration of global and regional trends in adult obesity prevalence (18+ years) using data from the World Health Organization (WHO). Designed for policymakers, international organizations (e.g., WHO, UNICEF, FAO), health ministries, NGOs, and researchers, the dashboard aims to facilitate data-driven decision-making by identifying high-risk areas and analyzing gender and geographical disparities.
 
-    By visualizing patterns and trends, this tool aims to support data-driven decision-making to tackle obesity globally and regionally.
-    """
+    Key features include:
+
+    Dynamic Map Visualization: Filter and highlight countries based on obesity rates to focus on specific regions or trends.
+    Comparative Trends: Analyze temporal trends at global, regional, and country levels to track changes over time.
+    Extreme Cases Analysis: Spotlight countries with the highest and lowest obesity rates to identify outliers and prioritize intervention areas.
+    This tool empowers stakeholders to create actionable strategies to combat obesity and promote public health initiatives worldwide.
+        """
 )
 
 st.sidebar.header("Interactive Data Filters")
@@ -153,6 +153,7 @@ lon_range = continent_ranges[selected_continent]["lon"]
 lat_range = continent_ranges[selected_continent]["lat"]
 
 if option == "Global Obesity Visualization":
+    st.header(f"Global Obesity Visualization ({selected_year})")
 
     # Calcular promedios y estadísticas
     avg_obesity_rate = filtered_data["RATE_PER_100_N"].mean()
@@ -160,49 +161,78 @@ if option == "Global Obesity Visualization":
     male_avg = avg_obesity_by_gender.get("MALE", float("nan"))
     female_avg = avg_obesity_by_gender.get("FEMALE", float("nan"))
 
-    # Identificar países con tasas más altas y más bajas
+    # Identify countries with high and low rates
     max_obesity = filtered_data.loc[filtered_data["RATE_PER_100_N"].idxmax()]
     min_obesity = filtered_data.loc[filtered_data["RATE_PER_100_N"].idxmin()]
+    
+    # Add a slider for selecting the range of obesity rates
+    min_rate, max_rate = filtered_data["RATE_PER_100_N"].min(), filtered_data["RATE_PER_100_N"].max()
+    selected_range = st.sidebar.slider(
+        "Select Obesity Rate Range displayed on the map:",
+        0,
+        100,
+        (0,100)
+    )
+
+    # Filter the data based on the selected range
+    filtered_data_range = filtered_data[
+        (filtered_data["RATE_PER_100_N"] >= selected_range[0]) &
+        (filtered_data["RATE_PER_100_N"] <= selected_range[1])
+    ]
 
     col1, col2 = st.columns([3, 1])
 
     with col1:
         fig = px.choropleth(
-            filtered_data,
-            geojson=filtered_data.geometry,
-            locations=filtered_data.index,
+            filtered_data_range,
+            geojson=filtered_data_range.geometry,
+            locations=filtered_data_range.index,
             color="RATE_PER_100_N",
             hover_name="NAME",
             hover_data={"RATE_PER_100_N": True, "DIM_TIME": False},
             title=f"{selected_continent}",
-            color_continuous_scale="RdYlGn_r",
+            color_continuous_scale=px.colors.sequential.Sunset,  
             labels={"RATE_PER_100_N": "Obesity Rate (%)"},
         )
+
+        # Map
         fig.update_geos(
             projection_type="natural earth",
             showcountries=True,
-            countrycolor="white",
+            countrycolor="#D6D6D6",  # Country boundaries
             showocean=True,
-            oceancolor="#BBDEFB",
+            oceancolor="#EAF6FF", 
             visible=True,
             lonaxis_range=lon_range,
             lataxis_range=lat_range,
             resolution=50,
         )
+
+        # Design and legend
         fig.update_layout(
             autosize=True,
-            title={"text": f"{selected_continent}", "x": 0.5, "xanchor": "center", "font": {"size": 20}},
+            title={
+                "text": f"{selected_continent}",
+                "x": 0.5,
+                "xanchor": "center",
+                "font": {"size": 20, "color": "#333"},  
+            },
             coloraxis_colorbar={
-                "title": "Obesity Rate (%)",
-                "len": 1.0,  # Hacer que la leyenda ocupe toda la altura de la gráfica
+                "title": "<b>Obesity Rate (%)</b>",
+                "len": 0.75,  
                 "yanchor": "middle",
                 "y": 0.5,
-                "thickness": 20,  # Ajustar el grosor
-                "x": 1.02,  # Posicionar la leyenda a la derecha del gráfico
+                "thickness": 15,
+                "x": 1.02,  
+                "tickfont": {"size": 12, "color": "#333"},  
+                "titlefont": {"size": 14, "color": "#333"},
             },
-            margin={"r": 3, "t": 30, "l": 3, "b": 10},
+            margin={"r": 10, "t": 30, "l": 10, "b": 10},
         )
+
+        # Show in Streamlit
         st.plotly_chart(fig, use_container_width=True)
+
 
     with col2:
         st.markdown(
@@ -397,6 +427,14 @@ if option == "Global Obesity Visualization":
 elif option == "Obesity Trends Over Time":
     st.header("Obesity Prevalence Trends")
 
+    # Add an introductory description
+    st.markdown(
+        """
+        This section visualizes the obesity prevalence trends over time, categorized by regions, countries, or continents.
+        Data source: World Health Organization (WHO), Open Data Repository.
+        """
+    )
+
     # Selector for grouping level
     view_option = st.sidebar.radio(
         "Show trends by:",
@@ -443,6 +481,13 @@ elif option == "Obesity Trends Over Time":
                 .mean()
                 .reset_index()
             )
+            # Determine if only one category is selected
+            if len(selected_groups) == 1:
+                line_color = ["#FF5733"]  # Streamlit's orange for a single line
+                markers = False  # Disable markers for single-line aesthetics
+            else:
+                line_color = px.colors.qualitative.Set2
+                markers = False
 
             # Create the plot using Plotly
             fig = px.line(
@@ -456,18 +501,19 @@ elif option == "Obesity Trends Over Time":
                     group_by_column: group_title,
                 },
                 title=f"Obesity Prevalence Trends by {group_title}",
-                markers=True,
-                color_discrete_sequence=px.colors.qualitative.Set2,
+                markers=markers,
+                color_discrete_sequence=line_color,
             )
 
             # Add the global trend if selected
             if include_global_trend:
+                # Smoothing the global trend for better interpretation
                 fig.add_scatter(
                     x=global_trend["DIM_TIME"],
-                    y=global_trend["Global Average"],
-                    mode="lines+markers",
-                    name="Global Average",
-                    line=dict(color="black", dash="dash"),
+                    y=global_trend['Global Average'],
+                    mode="lines",
+                    name="Global Trend Average",
+                    line=dict(color="black"),
                 )
 
             # Customize the layout
@@ -479,11 +525,11 @@ elif option == "Obesity Trends Over Time":
                 width=900,
                 height=600,
                 legend=dict(
-                    orientation="h",
-                    yanchor="bottom",
-                    y=-0.3,
-                    xanchor="center",
-                    x=0.5,
+                    orientation="v",  # Vertical alignment
+                    yanchor="top",
+                    y=1.0,
+                    xanchor="left",
+                    x=1.02,
                 ),
             )
 
@@ -491,6 +537,7 @@ elif option == "Obesity Trends Over Time":
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.warning("The required columns for creating the graph were not found.")
+
 
 # ----------------------------------------------------------------------
 # Footer with Data Source
