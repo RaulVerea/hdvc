@@ -25,9 +25,12 @@ st.markdown(
 
     Key features include:
 
-    Dynamic Map Visualization: Filter and highlight countries based on obesity rates to focus on specific regions or trends.
-    Comparative Trends: Analyze temporal trends at global, regional, and country levels to track changes over time.
-    Extreme Cases Analysis: Spotlight countries with the highest and lowest obesity rates to identify outliers and prioritize intervention areas.
+    **Dynamic Map Visualization**: Filter and highlight countries based on obesity rates to focus on specific regions or trends.
+
+    **Extreme Cases Analysis**: Spotlight countries with the highest and lowest obesity rates to identify outliers and prioritize intervention areas.
+
+    **Comparative Trends**: Analyze temporal trends at global, regional, and country levels to track changes over time.
+
     This tool empowers stakeholders to create actionable strategies to combat obesity and promote public health initiatives worldwide.
         """
 )
