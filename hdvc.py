@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import geopandas as gpd
-from geodatasets import get_path
+from geopandas import GeoDataFrame
 import matplotlib.pyplot as plt
 import seaborn as sns
 # ----------------------------------------------------------------------
@@ -64,17 +64,15 @@ data["NAME"] = data["NAME"].replace(name_corrections)
 # ----------------------------------------------------------------------
 # 4. Unir datos del mapa con los datos de obesidad
 # ----------------------------------------------------------------------
-# Asegúrate de que 'name' exista en ambos dataframes.
-# 'world' normalmente tiene una columna 'name' con los nombres de país,
-# pero puedes revisar si coincide con los nombres de tu dataset (puede ser 'iso_a3', etc.)
-world = world.merge(data, on="NAME", how="inner")
-
+world = world.merge(data, on="NAME", how="inner", suffixes=(None, "_drop"))
+world = GeoDataFrame(world, geometry="geometry", crs=world.crs)
 # Selección del año (DIM_TIME)
-available_years = sorted(data["DIM_TIME"].dropna().unique())
+available_years = sorted(world["DIM_TIME"].dropna().unique())
 selected_year = st.sidebar.selectbox("Selecciona un año:", available_years)
 
 # Filtrar los datos por el año seleccionado
-filtered_data = data[data["DIM_TIME"] == selected_year]
+filtered_data = world[world["DIM_TIME"] == selected_year]
+filtered_data = filtered_data.set_geometry("geometry", crs=world.crs)  # Asegurar geometría tras el filtrado
 
 # Eliminar la columna 'NAME' duplicada de world_merged
 #world.drop(columns=["NAME"], inplace=True)
@@ -93,9 +91,6 @@ option = st.sidebar.radio(
 if option == "Mapa Mundial":
     st.header("Mapa Mundial: Prevalencia de Obesidad por País")
 
-    # Asegurarse de que las columnas de los países coincidan en ambos DataFrames
-    world_filtered = world[["NAME", "geometry"]].copy()  # Filtramos solo las columnas necesarias
-    world_filtered = world_filtered.merge(filtered_data, on="NAME", how="left")
 
     # Pintar los países con la tasa de obesidad
     # Crear la figura y los ejes
@@ -105,7 +100,7 @@ if option == "Mapa Mundial":
     #world.boundary.plot(ax=ax, linewidth=0.5, color='black')
 
     # Pintar los países con la tasa de obesidad
-    world_filtered.plot(
+    filtered_data.plot(
         column="RATE_PER_100_N",
         ax=ax,
         cmap="RdYlGn_r",  # Escala de colores intuitiva: verde a rojo
